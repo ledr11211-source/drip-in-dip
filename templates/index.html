@@ -64,6 +64,12 @@
                         <option value="شبكة">شبكة</option>
                     </select>
                 </div>
+                
+                <div class="mb-3">
+                    <label for="date_added" class="form-label">تاريخ المعاملة (اختياري)</label>
+                    <input type="date" class="form-control" id="date_added" name="date_added">
+                </div>
+                
                 <button type="submit" class="btn btn-success w-100">إضافة معاملة</button>
             </form>
         </div>
@@ -80,6 +86,7 @@
                         <th>النوع</th>
                         <th>طريقة الدفع</th>
                         <th>التاريخ</th>
+                        <th>اسم المستخدم</th>
                         <th>الإجراء</th>
                     </tr>
                 </thead>
@@ -91,6 +98,7 @@
                         <td>{{ transaction.type }}</td>
                         <td>{{ transaction.payment_method }}</td>
                         <td>{{ transaction.date_added.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>{{ transaction.owner.username }}</td>
                         <td>
                             <a href="{{ url_for('delete_transaction', transaction_id=transaction.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من حذف هذه المعاملة؟');">حذف</a>
                         </td>
@@ -107,9 +115,10 @@
             <a href="{{ url_for('yearly_report') }}" class="btn btn-secondary">تقرير سنوي</a>
             <a href="{{ url_for('custom_report') }}" class="btn btn-dark">تقرير مخصص</a>
         </div>
+
+        <p class="text-center mt-5 mb-3 text-muted">تصميم وتطوير بواسطه حمزه القرشي</p>
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<p class="text-center mt-5 mb-3 text-muted">تصميم وتطوير بواسطه حمزه القرشي</p>
 </body>
 </html>

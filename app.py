@@ -91,12 +91,21 @@ def add_transaction():
             trans_type = request.form['type']
             payment_method = request.form['payment_method']
             
+            # --- هذا هو الكود الجديد للتعامل مع التاريخ ---
+            date_str = request.form.get('date_added')
+            if date_str:
+                transaction_date = datetime.strptime(date_str, '%Y-%m-%d')
+            else:
+                transaction_date = datetime.now()
+            # -----------------------------------------------
+
             new_transaction = Transaction(
                 amount=amount,
                 description=description,
                 type=trans_type,
                 payment_method=payment_method,
-                owner=current_user
+                owner=current_user,
+                date_added=transaction_date  # إضافة التاريخ إلى المعاملة
             )
             
             db.session.add(new_transaction)
@@ -144,7 +153,6 @@ def monthly_report():
         
     report_df = pd.DataFrame(report_data, columns=['الشهر', 'إيرادات الكاش', 'إيرادات الشبكة', 'مصروفات الكاش', 'مصروفات الشبكة', 'سحبيات الكاش', 'سحبيات الشبكة'])
     
-    # إضافة قائمة المعاملات التفصيلية
     transactions_list = [t.__dict__ for t in transactions]
     return render_template('monthly_report.html', report=report_df.to_dict('records'), transactions_list=transactions_list)
 
@@ -173,7 +181,6 @@ def yearly_report():
         
     report_df = pd.DataFrame(report_data, columns=['السنة', 'إيرادات الكاش', 'إيرادات الشبكة', 'مصروفات الكاش', 'مصروفات الشبكة', 'سحبيات الكاش', 'سحبيات الشبكة'])
     
-    # إضافة قائمة المعاملات التفصيلية
     transactions_list = [t.__dict__ for t in transactions]
     return render_template('yearly_report.html', report=report_df.to_dict('records'), transactions_list=transactions_list)
 
@@ -215,7 +222,6 @@ def custom_report():
                     'card_withdrawals': card_withdrawals,
                 }
                 
-                # إضافة قائمة المعاملات التفصيلية المفلترة
                 transactions_list = filtered_df.to_dict('records')
 
         except (ValueError, KeyError) as e:
@@ -229,12 +235,10 @@ def custom_report():
 def dashboard():
     transactions = get_transactions()
     
-    # حساب ملخص البيانات
     total_income = sum(t.amount for t in transactions if t.type == 'إيراد')
     total_expenses = sum(t.amount for t in transactions if t.type == 'مصروف' or t.type == 'سحب')
     net_balance = total_income - total_expenses
     
-    # إعداد البيانات للرسم البياني الشهري
     df = pd.DataFrame([t.__dict__ for t in transactions])
     if not df.empty:
         df['date_added'] = pd.to_datetime(df['date_added'])
@@ -255,7 +259,6 @@ def dashboard():
     else:
         monthly_data = {'labels': [], 'income': [], 'expenses': []}
         
-    # إعداد البيانات للرسم البياني الدائري للمصروفات
     expenses = df[df['type'].isin(['مصروف', 'سحب'])].copy()
     if not expenses.empty:
         expenses_data = expenses.groupby('description')['amount'].sum().nlargest(10).to_dict()
@@ -273,7 +276,6 @@ def dashboard():
         monthly_data=monthly_data,
         expenses_data=expenses_data_for_chart
     )
-
 
 @app.route('/export/<report_type>')
 @login_required
