@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>صفحة الدخل والمصروفات</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1, h2 { text-align: center; color: #333; }
+        .balance-box { background-color: #34495e; color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
+        form { display: flex; flex-direction: column; gap: 10px; }
+        input, select, button { padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; }
+        button { background-color: #3498db; color: white; border: none; cursor: pointer; }
+        button:hover { background-color: #2980b9; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .delete-btn { background-color: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 5px; text-decoration: none; }
+        .report-links a { text-decoration: none; padding: 10px 15px; border-radius: 5px; margin: 0 5px; color: white; }
+        .report-links .monthly { background-color: #2ecc71; }
+        .report-links .yearly { background-color: #e67e22; }
+        .report-links .custom { background-color: #9b59b6; }
+        .logout-btn { background-color: #c0392b; color: white; border: none; padding: 8px 15px; border-radius: 5px; text-decoration: none; position: absolute; top: 20px; right: 20px; }
+        .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <a href="{{ url_for('logout') }}" class="logout-btn">تسجيل الخروج</a>
+    <div class="container">
+        <h1>إدارة الدخل والمصروفات</h1>
+        <div class="balance-box">
+            الرصيد الحالي: {{ "%.2f"|format(balance) }} ﷼
+        </div>
+        
+        <h2>إضافة معاملة جديدة</h2>
+        <form action="{{ url_for('add_transaction') }}" method="post">
+            <input type="number" name="amount" placeholder="المبلغ" step="0.01" required>
+            <input type="text" name="description" placeholder="الوصف" required>
+            
+            <label for="type">نوع المعاملة:</label>
+            <select name="type" required>
+                <option value="إيراد">إيراد</option>
+                <option value="مصروف">مصروف</option>
+                <option value="سحب">سحب</option>
+            </select>
+
+            <label for="payment_method">طريقة الدفع:</label>
+            <select name="payment_method" required>
+                <option value="كاش">كاش</option>
+                <option value="شبكة">شبكة</option>
+            </select>
+
+            <button type="submit">إضافة</button>
+        </form>
+        
+        <h2 style="margin-top: 30px;">سجل المعاملات</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>النوع</th>
+                    <th>المبلغ</th>
+                    <th>طريقة الدفع</th>
+                    <th>الوصف</th>
+                    <th>إجراء</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for transaction in transactions %}
+                <tr>
+                    <td>{{ transaction.date_added.strftime('%Y-%m-%d %H:%M') }}</td>
+                    <td>{{ transaction.type }}</td>
+                    <td>{{ "%.2f"|format(transaction.amount) }}</td>
+                    <td>{{ transaction.payment_method }}</td>
+                    <td>{{ transaction.description }}</td>
+                    <td><a href="{{ url_for('delete_transaction', transaction_id=transaction.id) }}" class="delete-btn">حذف</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div style="text-align: center; margin-top: 20px;" class="report-links">
+            <h2>التقارير</h2>
+            <a href="{{ url_for('monthly_report') }}" class="monthly">تقرير شهري</a>
+            <a href="{{ url_for('yearly_report') }}" class="yearly">تقرير سنوي</a>
+            <a href="{{ url_for('custom_report') }}" class="custom">تقرير مخصص</a>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>تصميم وتطوير: حمزه القرشي</p>
+    </div>
+
+</body>
+</html>

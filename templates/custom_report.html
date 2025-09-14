@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تقرير مخصص</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1, h2 { text-align: center; color: #333; }
+        form { text-align: center; margin-top: 20px; }
+        form input { padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
+        form button { padding: 8px 15px; background-color: #3498db; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .report-summary { margin-top: 30px; text-align: center; font-size: 1.1em; }
+        .report-summary p { margin: 5px 0; }
+        .withdrawals-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .withdrawals-table th, .withdrawals-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        .withdrawals-table th { background-color: #f2f2f2; }
+        .export-btn { display: block; width: 200px; margin: 20px auto; padding: 10px; text-align: center; background-color: #1abc9c; color: white; text-decoration: none; border-radius: 5px; }
+        .nav-btn { background-color: #3498db; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; margin-top: 20px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>التقرير المخصص</h1>
+        <form action="{{ url_for('custom_report') }}" method="post">
+            <label for="start_date">من تاريخ:</label>
+            <input type="date" id="start_date" name="start_date" required>
+            <label for="end_date">إلى تاريخ:</label>
+            <input type="date" id="end_date" name="end_date" required>
+            <button type="submit">عرض التقرير</button>
+        </form>
+
+        {% if report %}
+            <div class="report-summary">
+                <h2>ملخص التقرير</h2>
+                <p><strong>إيرادات الكاش:</strong> {{ "%.2f"|format(report.cash_income) }} ﷼</p>
+                <p><strong>إيرادات الشبكة:</strong> {{ "%.2f"|format(report.card_income) }} ﷼</p>
+                <p><strong>مصروفات الكاش:</strong> {{ "%.2f"|format(report.cash_expenses) }} ﷼</p>
+                <p><strong>مصروفات الشبكة:</strong> {{ "%.2f"|format(report.card_expenses) }} ﷼</p>
+                <p><strong>سحبيات الكاش:</strong> {{ "%.2f"|format(report.cash_withdrawals) }} ﷼</p>
+                <p><strong>سحبيات الشبكة:</strong> {{ "%.2f"|format(report.card_withdrawals) }} ﷼</p>
+            </div>
+
+            <a href="{{ url_for('export_excel', report_type='custom', start_date=request.form['start_date'], end_date=request.form['end_date']) }}" class="export-btn">تصدير إلى Excel</a>
+        {% endif %}
+
+        <p style="text-align: center; margin-top: 20px;"><a href="{{ url_for('home') }}" class="nav-btn">العودة إلى الصفحة الرئيسية</a></p>
+    </div>
+</body>
+</html>

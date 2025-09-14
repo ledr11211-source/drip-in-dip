@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تقرير سنوي</title>
+    <style>
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .export-btn { display: block; width: 200px; margin: 20px auto; padding: 10px; text-align: center; background-color: #1abc9c; color: white; text-decoration: none; border-radius: 5px; }
+        .nav-btn { background-color: #3498db; color: white; text-decoration: none; padding: 10px 15px; border-radius: 5px; margin-top: 20px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>التقرير السنوي</h1>
+        {% if not report %}
+            <p style="text-align: center;">لا توجد بيانات لإنشاء التقرير.</p>
+        {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>السنة</th>
+                        <th>إيرادات الكاش</th>
+                        <th>إيرادات الشبكة</th>
+                        <th>مصروفات الكاش</th>
+                        <th>مصروفات الشبكة</th>
+                        <th>سحبيات الكاش</th>
+                        <th>سحبيات الشبكة</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in report %}
+                    <tr>
+                        <td>{{ row['السنة'] }}</td>
+                        <td>{{ "%.2f"|format(row['إيرادات الكاش']) }}</td>
+                        <td>{{ "%.2f"|format(row['إيرادات الشبكة']) }}</td>
+                        <td>{{ "%.2f"|format(row['مصروفات الكاش']) }}</td>
+                        <td>{{ "%.2f"|format(row['مصروفات الشبكة']) }}</td>
+                        <td>{{ "%.2f"|format(row['سحبيات الكاش']) }}</td>
+                        <td>{{ "%.2f"|format(row['سحبيات الشبكة']) }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <a href="{{ url_for('export_excel', report_type='yearly') }}" class="export-btn">تصدير إلى Excel</a>
+        {% endif %}
+        <p style="text-align: center; margin-top: 20px;"><a href="{{ url_for('home') }}" class="nav-btn">العودة إلى الصفحة الرئيسية</a></p>
+    </div>
+</body>
+</html>
