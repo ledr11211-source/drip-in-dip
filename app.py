@@ -118,7 +118,7 @@ def delete_transaction(transaction_id):
     db.session.commit()
     return redirect(url_for('home'))
 
-# --- دوال التقارير الجديدة ---
+# --- الدوال المعدلة للتقارير ---
 @app.route('/reports/monthly')
 @login_required
 def monthly_report():
@@ -144,7 +144,9 @@ def monthly_report():
         
     report_df = pd.DataFrame(report_data, columns=['الشهر', 'إيرادات الكاش', 'إيرادات الشبكة', 'مصروفات الكاش', 'مصروفات الشبكة', 'سحبيات الكاش', 'سحبيات الشبكة'])
     
-    return render_template('monthly_report.html', report=report_df.to_dict('records'))
+    # إضافة قائمة المعاملات التفصيلية
+    transactions_list = [t.__dict__ for t in transactions]
+    return render_template('monthly_report.html', report=report_df.to_dict('records'), transactions_list=transactions_list)
 
 @app.route('/reports/yearly')
 @login_required
@@ -171,45 +173,107 @@ def yearly_report():
         
     report_df = pd.DataFrame(report_data, columns=['السنة', 'إيرادات الكاش', 'إيرادات الشبكة', 'مصروفات الكاش', 'مصروفات الشبكة', 'سحبيات الكاش', 'سحبيات الشبكة'])
     
-    return render_template('yearly_report.html', report=report_df.to_dict('records'))
+    # إضافة قائمة المعاملات التفصيلية
+    transactions_list = [t.__dict__ for t in transactions]
+    return render_template('yearly_report.html', report=report_df.to_dict('records'), transactions_list=transactions_list)
 
 @app.route('/reports/custom', methods=['GET', 'POST'])
 @login_required
 def custom_report():
     report_data = None
+    transactions_list = []
     if request.method == 'POST':
-        start_date_str = request.form['start_date']
-        end_date_str = request.form['end_date']
-        
-        start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
-
-        transactions = get_transactions()
-        df = pd.DataFrame([t.__dict__ for t in transactions])
-        df['date_added'] = pd.to_datetime(df['date_added'])
-
-        filtered_df = df[(df['date_added'] >= start_date) & (df['date_added'] <= end_date)].copy()
-        
-        if filtered_df.empty:
-            flash('لا توجد معاملات في النطاق الزمني المحدد.')
-        else:
-            cash_income = filtered_df[(filtered_df['type'] == 'إيراد') & (filtered_df['payment_method'] == 'كاش')]['amount'].sum()
-            card_income = filtered_df[(filtered_df['type'] == 'إيراد') & (filtered_df['payment_method'] == 'شبكة')]['amount'].sum()
-            cash_expenses = filtered_df[(filtered_df['type'] == 'مصروف') & (filtered_df['payment_method'] == 'كاش')]['amount'].sum()
-            card_expenses = filtered_df[(filtered_df['type'] == 'مصروف') & (filtered_df['payment_method'] == 'شبكة')]['amount'].sum()
-            cash_withdrawals = filtered_df[(filtered_df['type'] == 'سحب') & (filtered_df['payment_method'] == 'كاش')]['amount'].sum()
-            card_withdrawals = filtered_df[(filtered_df['type'] == 'سحب') & (filtered_df['payment_method'] == 'شبكة')]['amount'].sum()
+        try:
+            start_date_str = request.form['start_date']
+            end_date_str = request.form['end_date']
             
-            report_data = {
-                'cash_income': cash_income,
-                'card_income': card_income,
-                'cash_expenses': cash_expenses,
-                'card_expenses': card_expenses,
-                'cash_withdrawals': cash_withdrawals,
-                'card_withdrawals': card_withdrawals,
-            }
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').replace(hour=23, minute=59, second=59)
 
-    return render_template('custom_report.html', report=report_data)
+            transactions = get_transactions()
+            df = pd.DataFrame([t.__dict__ for t in transactions])
+            df['date_added'] = pd.to_datetime(df['date_added'])
+
+            filtered_df = df[(df['date_added'] >= start_date) & (df['date_added'] <= end_date)].copy()
+            
+            if filtered_df.empty:
+                flash('لا توجد معاملات في النطاق الزمني المحدد.')
+            else:
+                cash_income = filtered_df[(filtered_df['type'] == 'إيراد') & (filtered_df['payment_method'] == 'كاش')]['amount'].sum()
+                card_income = filtered_df[(filtered_df['type'] == 'إيراد') & (filtered_df['payment_method'] == 'شبكة')]['amount'].sum()
+                cash_expenses = filtered_df[(filtered_df['type'] == 'مصروف') & (filtered_df['payment_method'] == 'كاش')]['amount'].sum()
+                card_expenses = filtered_df[(filtered_df['type'] == 'مصروف') & (filtered_df['payment_method'] == 'شبكة')]['amount'].sum()
+                cash_withdrawals = filtered_df[(filtered_df['type'] == 'سحب') & (filtered_df['payment_method'] == 'كاش')]['amount'].sum()
+                card_withdrawals = filtered_df[(filtered_df['type'] == 'سحب') & (filtered_df['payment_method'] == 'شبكة')]['amount'].sum()
+                
+                report_data = {
+                    'cash_income': cash_income,
+                    'card_income': card_income,
+                    'cash_expenses': cash_expenses,
+                    'card_expenses': card_expenses,
+                    'cash_withdrawals': cash_withdrawals,
+                    'card_withdrawals': card_withdrawals,
+                }
+                
+                # إضافة قائمة المعاملات التفصيلية المفلترة
+                transactions_list = filtered_df.to_dict('records')
+
+        except (ValueError, KeyError) as e:
+            flash(f"خطأ في الإدخال: {e}")
+            
+    return render_template('custom_report.html', report=report_data, transactions_list=transactions_list)
+
+# --- دالة الداشبورد الجديدة ---
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    transactions = get_transactions()
+    
+    # حساب ملخص البيانات
+    total_income = sum(t.amount for t in transactions if t.type == 'إيراد')
+    total_expenses = sum(t.amount for t in transactions if t.type == 'مصروف' or t.type == 'سحب')
+    net_balance = total_income - total_expenses
+    
+    # إعداد البيانات للرسم البياني الشهري
+    df = pd.DataFrame([t.__dict__ for t in transactions])
+    if not df.empty:
+        df['date_added'] = pd.to_datetime(df['date_added'])
+        df['month_year'] = df['date_added'].dt.to_period('M')
+        
+        monthly_summary = df.groupby('month_year').apply(
+            lambda x: pd.Series({
+                'income': x[x['type'] == 'إيراد']['amount'].sum(),
+                'expenses': x[x['type'].isin(['مصروف', 'سحب'])]['amount'].sum()
+            })
+        )
+        
+        monthly_data = {
+            'labels': monthly_summary.index.astype(str).tolist(),
+            'income': monthly_summary['income'].tolist(),
+            'expenses': monthly_summary['expenses'].tolist()
+        }
+    else:
+        monthly_data = {'labels': [], 'income': [], 'expenses': []}
+        
+    # إعداد البيانات للرسم البياني الدائري للمصروفات
+    expenses = df[df['type'].isin(['مصروف', 'سحب'])].copy()
+    if not expenses.empty:
+        expenses_data = expenses.groupby('description')['amount'].sum().nlargest(10).to_dict()
+        expenses_labels = list(expenses_data.keys())
+        expenses_values = list(expenses_data.values())
+        expenses_data_for_chart = {'labels': expenses_labels, 'values': expenses_values}
+    else:
+        expenses_data_for_chart = {'labels': [], 'values': []}
+
+    return render_template(
+        'dashboard.html',
+        total_income=total_income,
+        total_expenses=total_expenses,
+        net_balance=net_balance,
+        monthly_data=monthly_data,
+        expenses_data=expenses_data_for_chart
+    )
+
 
 @app.route('/export/<report_type>')
 @login_required

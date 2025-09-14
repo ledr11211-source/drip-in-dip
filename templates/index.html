@@ -3,103 +3,112 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>صفحة الدخل والمصروفات</title>
+    <title>إدارة المعاملات</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 0; }
-        .container-custom { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5; margin: 0; padding: 20px; }
+        .container-custom { max-width: 900px; margin: auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         h1, h2 { text-align: center; color: #333; }
-        .balance-box { background-color: #34495e; color: white; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; }
-        .form-group { margin-bottom: 15px; }
-        .form-control { padding: 10px; border-radius: 5px; border: 1px solid #ccc; font-size: 16px; width: 100%; }
-        .btn { padding: 10px 15px; border-radius: 5px; border: none; cursor: pointer; color: white; }
-        .btn-primary { background-color: #3498db; }
-        .btn-primary:hover { background-color: #2980b9; }
-        .btn-danger { background-color: #e74c3c; }
-        .report-links a { text-decoration: none; padding: 10px 15px; border-radius: 5px; margin: 0 5px; color: white; display: inline-block; }
-        .report-links .monthly { background-color: #2ecc71; }
-        .report-links .yearly { background-color: #e67e22; }
-        .report-links .custom { background-color: #9b59b6; }
-        .logout-btn { background-color: #c0392b; color: white; border: none; padding: 8px 15px; border-radius: 5px; text-decoration: none; position: absolute; top: 20px; right: 20px; }
-        .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
+        .form-section { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .transaction-table { margin-top: 20px; }
+        .report-links a { margin: 5px; }
+        .balance-box { padding: 10px; border-radius: 5px; margin-bottom: 15px; }
+        .balance-income { background-color: #d4edda; color: #155724; }
+        .balance-expenses { background-color: #f8d7da; color: #721c24; }
+        .balance-zero { background-color: #e2e3e5; color: #383d41; }
     </style>
 </head>
 <body>
-    <a href="{{ url_for('logout') }}" class="logout-btn">تسجيل الخروج</a>
     <div class="container container-custom mt-4 mb-4">
-        <h1 class="mb-4">إدارة الدخل والمصروفات</h1>
-        <div class="balance-box">
-            الرصيد الحالي: {{ "%.2f"|format(balance) }} ﷼
+        <h1>إدارة المعاملات</h1>
+
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        <div class="alert alert-info text-center" role="alert">
+            {{ messages[0] }}
         </div>
+        {% endif %}
+        {% endwith %}
         
-        <h2 class="mb-3">إضافة معاملة جديدة</h2>
-        <form action="{{ url_for('add_transaction') }}" method="post">
-            <div class="row g-3">
-                <div class="col-md-6">
-                    <input type="number" name="amount" placeholder="المبلغ" step="0.01" class="form-control" required>
+        <p class="text-end mb-4"><a href="{{ url_for('logout') }}" class="btn btn-sm btn-outline-danger">تسجيل الخروج</a></p>
+
+        {% if not is_admin %}
+        <div class="balance-box text-center {% if balance > 0 %}balance-income{% elif balance < 0 %}balance-expenses{% else %}balance-zero{% endif %}">
+            <h4>رصيدك الحالي: {{ "%.2f"|format(balance) }} ﷼</h4>
+        </div>
+        {% endif %}
+
+        <div class="form-section">
+            <h2 class="mb-3">إضافة معاملة جديدة</h2>
+            <form action="{{ url_for('add_transaction') }}" method="post" class="needs-validation" novalidate>
+                <div class="mb-3">
+                    <label for="amount" class="form-label">المبلغ</label>
+                    <input type="number" class="form-control" id="amount" name="amount" required step="0.01">
                 </div>
-                <div class="col-md-6">
-                    <input type="text" name="description" placeholder="الوصف" class="form-control" required>
+                <div class="mb-3">
+                    <label for="description" class="form-label">الوصف</label>
+                    <input type="text" class="form-control" id="description" name="description" required>
                 </div>
-                <div class="col-md-6">
-                    <select name="type" class="form-select" required>
+                <div class="mb-3">
+                    <label for="type" class="form-label">النوع</label>
+                    <select class="form-select" id="type" name="type" required>
                         <option value="إيراد">إيراد</option>
                         <option value="مصروف">مصروف</option>
-                        <option value="سحب">سحب</option>
+                        <option value="سحب">سحب (للمبالغ المسحوبة)</option>
                     </select>
                 </div>
-                <div class="col-md-6">
-                    <select name="payment_method" class="form-select" required>
+                <div class="mb-3">
+                    <label for="payment_method" class="form-label">طريقة الدفع</label>
+                    <select class="form-select" id="payment_method" name="payment_method" required>
                         <option value="كاش">كاش</option>
                         <option value="شبكة">شبكة</option>
                     </select>
                 </div>
-                <div class="col-12">
-                    <button type="submit" class="btn btn-primary w-100">إضافة</button>
-                </div>
-            </div>
-        </form>
-        
-        <h2 class="mt-5 mb-3">سجل المعاملات</h2>
-        <div class="table-responsive">
+                <button type="submit" class="btn btn-success w-100">إضافة معاملة</button>
+            </form>
+        </div>
+
+        <hr>
+
+        <h2 class="mt-4">قائمة المعاملات</h2>
+        <div class="table-responsive transaction-table">
             <table class="table table-striped table-hover text-center">
                 <thead>
                     <tr>
-                        <th>التاريخ</th>
-                        <th>النوع</th>
                         <th>المبلغ</th>
-                        <th>طريقة الدفع</th>
                         <th>الوصف</th>
-                        <th>إجراء</th>
+                        <th>النوع</th>
+                        <th>طريقة الدفع</th>
+                        <th>التاريخ</th>
+                        <th>الإجراء</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for transaction in transactions %}
                     <tr>
-                        <td>{{ transaction.date_added.strftime('%Y-%m-%d %H:%M') }}</td>
-                        <td>{{ transaction.type }}</td>
-                        <td>{{ "%.2f"|format(transaction.amount) }}</td>
-                        <td>{{ transaction.payment_method }}</td>
+                        <td class="{{ 'text-success' if transaction.type == 'إيراد' else 'text-danger' }}">{{ "%.2f"|format(transaction.amount) }}</td>
                         <td>{{ transaction.description }}</td>
-                        <td><a href="{{ url_for('delete_transaction', transaction_id=transaction.id) }}" class="btn btn-danger btn-sm">حذف</a></td>
+                        <td>{{ transaction.type }}</td>
+                        <td>{{ transaction.payment_method }}</td>
+                        <td>{{ transaction.date_added.strftime('%Y-%m-%d %H:%M') }}</td>
+                        <td>
+                            <a href="{{ url_for('delete_transaction', transaction_id=transaction.id) }}" class="btn btn-sm btn-danger" onclick="return confirm('هل أنت متأكد من حذف هذه المعاملة؟');">حذف</a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-        
+
         <div class="text-center mt-4 report-links">
             <h2 class="mb-3">التقارير</h2>
-            <a href="{{ url_for('monthly_report') }}" class="monthly btn">تقرير شهري</a>
-            <a href="{{ url_for('yearly_report') }}" class="yearly btn">تقرير سنوي</a>
-            <a href="{{ url_for('custom_report') }}" class="custom btn">تقرير مخصص</a>
+            <a href="{{ url_for('dashboard') }}" class="btn btn-primary">الداشبورد</a>
+            <a href="{{ url_for('monthly_report') }}" class="btn btn-info text-white">تقرير شهري</a>
+            <a href="{{ url_for('yearly_report') }}" class="btn btn-secondary">تقرير سنوي</a>
+            <a href="{{ url_for('custom_report') }}" class="btn btn-dark">تقرير مخصص</a>
         </div>
     </div>
     
-    <div class="footer">
-        <p>تصميم وتطوير: حمزه القرشي</p>
-    </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
