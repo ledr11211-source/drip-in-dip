@@ -133,13 +133,20 @@ def reset_password(token):
     
     if user and user.reset_token_expiration > datetime.utcnow():
         if request.method == 'POST':
-            new_password = request.form['new_password']
-            user.password_hash = generate_password_hash(new_password)
+            password = request.form.get('password')
+            password2 = request.form.get('password2')
+            
+            if password != password2:
+                flash("كلمتا المرور غير متطابقتين. حاول مرة أخرى.")
+                return redirect(url_for('reset_password', token=token))
+            
+            user.password_hash = generate_password_hash(password)
             user.reset_token = None
             user.reset_token_expiration = None
             db.session.commit()
             flash("تم إعادة تعيين كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول.")
             return redirect(url_for('login'))
+        
         return render_template('reset_password.html', token=token)
     else:
         flash("الرابط غير صالح أو انتهت صلاحيته.")
