@@ -1,17 +1,32 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, Response
 from models import db, Transaction, User
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import pandas as pd
 from io import BytesIO
+import os
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+import secrets
 
 # تهيئة تطبيق Flask
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your_very_secret_key_here'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///transactions.db'
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///transactions.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
+
+# إعدادات البريد الإلكتروني
+MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
+MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+MAIL_FROM = os.environ.get('MAIL_FROM')
+RESET_KEY = os.environ.get('RESET_KEY')
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -21,14 +36,37 @@ login_manager.login_view = 'login'
 def load_user(user_id):
     return User.query.get(int(user_id))
 
-with app.app_context():
-    db.create_all()
+def send_email(to_email, subject, body):
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = MAIL_FROM
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+
+        with smtplib.SMTP('smtp.gmail.com', 587) as server:
+            server.starttls()
+            server.login(MAIL_USERNAME, MAIL_PASSWORD)
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return False
+
+# مسار مؤقت لحذف ملف قاعدة البيانات (المُضاف حديثًا)
+@app.route('/delete-db')
+def delete_db():
+    if os.path.exists('transactions.db'):
+        os.remove('transactions.db')
+        return "تم حذف ملف قاعدة البيانات بنجاح. يرجى إعادة تشغيل التطبيق."
+    return "لم يتم العثور على ملف قاعدة البيانات."
 
 @app.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        email = request.form['email']
         
         user = User.query.filter_by(username=username).first()
         if user:
@@ -36,7 +74,7 @@ def register():
         else:
             hashed_password = generate_password_hash(password)
             is_admin = not bool(User.query.count())
-            new_user = User(username=username, password_hash=hashed_password, is_admin=is_admin)
+            new_user = User(username=username, password_hash=hashed_password, is_admin=is_admin, email=email)
             db.session.add(new_user)
             db.session.commit()
             flash('تم إنشاء حسابك بنجاح! يمكنك الآن تسجيل الدخول.')
@@ -57,16 +95,61 @@ def login():
             flash('اسم المستخدم أو كلمة المرور غير صحيحة.')
     return render_template('login.html')
 
+# --- دوال إعادة تعيين كلمة المرور الجديدة ---
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email')
+        user = User.query.filter_by(email=email).first()
+        if user:
+            token = secrets.token_urlsafe(32)
+            user.reset_token = token
+            user.reset_token_expiration = datetime.utcnow() + timedelta(hours=1)
+            db.session.commit()
+            
+            reset_url = url_for('reset_password', token=token, _external=True)
+            subject = "إعادة تعيين كلمة المرور"
+            body = f"مرحباً {user.username},\n\nلإعادة تعيين كلمة المرور، يرجى الضغط على الرابط التالي:\n{reset_url}\n\nهذا الرابط صالح لمدة ساعة واحدة فقط.\n\nإذا لم تطلب إعادة تعيين كلمة المرور، يرجى تجاهل هذه الرسالة."
+            
+            if send_email(user.email, subject, body):
+                flash("تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني.")
+            else:
+                flash("حدث خطأ أثناء إرسال البريد. يرجى المحاولة مرة أخرى لاحقاً.")
+        else:
+            flash("لا يوجد حساب مرتبط بهذا البريد الإلكتروني.")
+            
+        return redirect(url_for('login'))
+    return render_template('forgot_password.html')
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password(token):
+    user = User.query.filter_by(reset_token=token).first()
+    
+    if user and user.reset_token_expiration > datetime.utcnow():
+        if request.method == 'POST':
+            new_password = request.form['new_password']
+            user.password_hash = generate_password_hash(new_password)
+            user.reset_token = None
+            user.reset_token_expiration = None
+            db.session.commit()
+            flash("تم إعادة تعيين كلمة المرور بنجاح. يمكنك الآن تسجيل الدخول.")
+            return redirect(url_for('login'))
+        return render_template('reset_password.html', token=token)
+    else:
+        flash("الرابط غير صالح أو انتهت صلاحيته.")
+        return redirect(url_for('forgot_password'))
+# --- نهاية دوال إعادة تعيين كلمة المرور ---
+
 @app.route('/logout')
 def logout():
     logout_user()
     return redirect(url_for('login'))
 
-def get_transactions():
+def get_transactions(is_archived=False):
     if current_user.is_admin:
-        return Transaction.query.order_by(Transaction.date_added.desc()).all()
+        return Transaction.query.filter_by(is_archived=is_archived).order_by(Transaction.date_added.desc()).all()
     else:
-        return Transaction.query.filter_by(user_id=current_user.id).order_by(Transaction.date_added.desc()).all()
+        return Transaction.query.filter_by(user_id=current_user.id, is_archived=is_archived).order_by(Transaction.date_added.desc()).all()
 
 @app.route('/')
 @login_required
@@ -91,13 +174,11 @@ def add_transaction():
             trans_type = request.form['type']
             payment_method = request.form['payment_method']
             
-            # --- هذا هو الكود الجديد للتعامل مع التاريخ ---
             date_str = request.form.get('date_added')
             if date_str:
                 transaction_date = datetime.strptime(date_str, '%Y-%m-%d')
             else:
                 transaction_date = datetime.now()
-            # -----------------------------------------------
 
             new_transaction = Transaction(
                 amount=amount,
@@ -105,7 +186,7 @@ def add_transaction():
                 type=trans_type,
                 payment_method=payment_method,
                 owner=current_user,
-                date_added=transaction_date  # إضافة التاريخ إلى المعاملة
+                date_added=transaction_date
             )
             
             db.session.add(new_transaction)
@@ -115,17 +196,37 @@ def add_transaction():
             flash(f"خطأ في الإدخال: {e}")
             return redirect(url_for('home'))
 
-@app.route('/delete/<int:transaction_id>')
+@app.route('/archive/<int:transaction_id>')
 @login_required
-def delete_transaction(transaction_id):
-    transaction_to_delete = Transaction.query.get_or_404(transaction_id)
-    if not current_user.is_admin and transaction_to_delete.owner != current_user:
-        flash("غير مصرح لك بحذف هذه المعاملة.")
+def archive_transaction(transaction_id):
+    transaction_to_archive = Transaction.query.get_or_404(transaction_id)
+    if not current_user.is_admin and transaction_to_archive.owner != current_user:
+        flash("غير مصرح لك بأرشفة هذه المعاملة.")
         return redirect(url_for('home'))
-
-    db.session.delete(transaction_to_delete)
+    
+    transaction_to_archive.is_archived = True
     db.session.commit()
+    flash("تم أرشفة المعاملة بنجاح.")
     return redirect(url_for('home'))
+
+@app.route('/archive')
+@login_required
+def view_archive():
+    archived_transactions = get_transactions(is_archived=True)
+    return render_template('archive.html', transactions=archived_transactions, is_admin=current_user.is_admin)
+
+@app.route('/restore/<int:transaction_id>')
+@login_required
+def restore_transaction(transaction_id):
+    transaction_to_restore = Transaction.query.get_or_404(transaction_id)
+    if not current_user.is_admin and transaction_to_restore.owner != current_user:
+        flash("غير مصرح لك باستعادة هذه المعاملة.")
+        return redirect(url_for('view_archive'))
+    
+    transaction_to_restore.is_archived = False
+    db.session.commit()
+    flash("تم استعادة المعاملة بنجاح.")
+    return redirect(url_for('view_archive'))
 
 # --- الدوال المعدلة للتقارير ---
 @app.route('/reports/monthly')
@@ -229,7 +330,6 @@ def custom_report():
             
     return render_template('custom_report.html', report=report_data, transactions_list=transactions_list)
 
-# --- دالة الداشبورد الجديدة ---
 @app.route('/dashboard')
 @login_required
 def dashboard():
@@ -337,6 +437,7 @@ def export_excel(report_type):
     
     return send_file(output, as_attachment=True, download_name=file_name, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
-# هذا السطر ضروري ليعمل التطبيق على الخوادم مثل Render
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run()
