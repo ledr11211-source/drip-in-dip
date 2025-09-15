@@ -68,31 +68,37 @@ def register():
         password = request.form['password']
         email = request.form['email']
         
-        user = User.query.filter_by(username=username).first()
-        if user:
-            flash('اسم المستخدم موجود بالفعل. الرجاء اختيار اسم آخر.')
+        user_exists = User.query.filter_by(username=username).first()
+        email_exists = User.query.filter_by(email=email).first()
+
+        if user_exists:
+            flash('اسم المستخدم موجود بالفعل. الرجاء اختيار اسم آخر.', 'danger')
+        elif email_exists:
+            flash('هذا البريد الإلكتروني مسجل بالفعل. الرجاء استخدام بريد آخر.', 'danger')
         else:
             hashed_password = generate_password_hash(password)
             is_admin = not bool(User.query.count())
             new_user = User(username=username, password_hash=hashed_password, is_admin=is_admin, email=email)
             db.session.add(new_user)
             db.session.commit()
-            flash('تم إنشاء حسابك بنجاح! يمكنك الآن تسجيل الدخول.')
+            flash('تم إنشاء حسابك بنجاح! يمكنك الآن تسجيل الدخول.', 'success')
             return redirect(url_for('login'))
     return render_template('register.html')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        email = request.form['email']
         password = request.form['password']
-        user = User.query.filter_by(username=username).first()
+        user = User.query.filter_by(email=email).first()
         
         if user and check_password_hash(user.password_hash, password):
             login_user(user)
+            flash('تم تسجيل الدخول بنجاح.', 'success')
             return redirect(url_for('home'))
         else:
-            flash('اسم المستخدم أو كلمة المرور غير صحيحة.')
+            flash('البريد الإلكتروني أو كلمة المرور غير صحيحة.', 'danger')
+            
     return render_template('login.html')
 
 # --- دوال إعادة تعيين كلمة المرور الجديدة ---
